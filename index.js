@@ -5,7 +5,10 @@ const config = require('./config.json');
 
 client.commands = new Discord.Collection();
 
-// Lees de command-bestanden
+// Importeer het dashboard, zodat de Express-server start
+require('./dashboard/dashboard');
+
+// Laad alle command-bestanden in de `commands`-map
 fs.readdirSync('./commands').forEach(file => {
     if (file.endsWith('.js')) {
         const command = require(`./commands/${file}`);
@@ -24,7 +27,9 @@ client.on('message', message => {
     const commandName = args.shift().toLowerCase();
 
     const command = client.commands.get(commandName);
-    if (command) command.execute(message, args);
+    if (command) {
+        command.execute(message, args);
+    }
 });
 
 client.login(config.token);
