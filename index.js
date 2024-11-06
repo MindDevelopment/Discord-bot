@@ -1,56 +1,97 @@
-// Importeer de nodige modules
-const fs = require('fs');
-const Discord = require('discord.js');
-const { Intents } = require('discord.js'); // Importeer Intents
-const config = require('./config.json');
+// index.js - Het dashboard en de server voor de bot beheren
+const cors = require('cors');
+const express = require('express');
+const { exec } = require('child_process');
+const WebSocket = require('ws');
 
-// Maak een nieuwe Discord Client aan met de benodigde intents
-const client = new Discord.Client({
-    intents: [
-        Intents.FLAGS.GUILDS,                 // Nodig voor guild-specifieke functies
-        Intents.FLAGS.GUILD_MESSAGES,         // Nodig om berichten te lezen en te reageren
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS // Nodig om te reageren op berichten
-    ]
-});
+// Maak een express app voor het dashboard
+const app = express();
+app.use(cors());
 
-// Laad alle commands in uit de commands-map
-client.commands = new Discord.Collection();
-fs.readdirSync('./commands').forEach(file => {
-    if (file.endsWith('.js')) {
-        const command = require(`./commands/${file}`);
-        client.commands.set(command.name, command);
-    }
-});
+// Serve de statische bestanden van het dashboard (bijv. HTML, CSS, JS)
+app.use(express.static('public')); // Zorg ervoor dat de 'public' map bestaat
 
-// Start het dashboard door het dashboard-bestand te importeren
-require('./dashboard/dashboard');
-
-// Event: Wanneer de bot online gaat
-client.once('ready', () => {
-    console.log('Bot is online!');
-});
-
-// Event: Wanneer een bericht wordt ontvangen
-client.on('message', message => {
-    // Controleer of het bericht begint met de prefix en niet van een bot afkomstig is
-    if (!message.content.startsWith(config.prefix) || message.author.bot) return;
-
-    // Verwijder de prefix en splits het bericht in command en argumenten
-    const args = message.content.slice(config.prefix.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-
-    // Zoek het command in de client.commands collectie
-    const command = client.commands.get(commandName);
-    if (command) {
-        // Voer het command uit als het bestaat
-        try {
-            command.execute(message, args);
-        } catch (error) {
-            console.error(error);
-            message.reply('Er is iets fout gegaan bij het uitvoeren van dat command!');
+// Stop route voor de bot
+app.post('/dashboard/stop', (req, res) => {
+    exec('pm2 stop bot.js --name "bot"', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return res.status(500).send("Er is iets mis gegaan met het stoppen van de bot.");
         }
-    }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return res.status(500).send("Er is iets mis gegaan met het stoppen van de bot.");
+        }
+        console.log(`stdout: ${stdout}`);
+        res.send("Bot is stopped.");
+    });
 });
 
-// Login de bot met de token uit config.json
-client.login(config.token);
+// Start route voor de bot
+app.post('/dashboard/start', (req, res) => {
+    exec('pm2 start bot.js --name "bot"', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return res.status(500).send("Er is iets mis gegaan met het starten van de bot.");
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return res.status(500).send("Er is iets mis gegaan met het starten van de bot.");
+        }
+        console.log(`stdout: ${stdout}`);
+        res.send("Bot is starting...");
+    });
+});
+
+// Restart route voor de bot
+app.post('/dashboard/restart', (req, res) => {
+    exec('pm2 restart bot.js', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return res.status(500).send("Er is iets mis gegaan met het herstarten van de bot.");
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return res.status(500).send("Er is iets mis gegaan met het herstarten van de bot.");
+        }
+        console.log(`stdout: ${stdout}`);
+        res.send("Bot is restarting...");
+    });
+});
+
+// Nieuwe route voor de consolepagina
+app.get('/dashboard/console', (req, res) => {
+    res.sendFile(__dirname + '/public/console.html');  // Verwijs naar de nieuwe consolepagina
+});
+
+// Setup WebSocket server voor console logs en commando's
+const wss = new WebSocket.Server({ noServer: true });
+
+// Wanneer een nieuwe WebSocket-client verbinding maakt
+wss.on('connection', ws => {
+    console.log("A new client connected to the console.");
+
+    // Gebruik 'pm2' om de logs van de bot te lezen en deze naar de WebSocket-client te sturen
+    const logStream = exec('pm2 logs bot --lines 100 --watch');  // Volg de laatste 100 regels van de botlog
+
+    logStream.stdout.on('data', data => {
+        ws.send(data.toString());  // Stuur de data naar de WebSocket client
+    });
+
+    ws.on('close', () => {
+        console.log("Client disconnected from the console.");
+        logStream.kill();  // Stop de log stream als de client de verbinding verbreekt
+    });
+});
+
+// Zorg ervoor dat de WebSocket-server werkt via de express-server
+app.server = app.listen(3000, () => {
+    console.log('Dashboard is running op http://localhost:3000');
+});
+
+// Verbind de WebSocket-server met de HTTP-server
+app.server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+    });
+});
