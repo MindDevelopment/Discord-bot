@@ -8,6 +8,9 @@ const WebSocket = require('ws');
 const app = express();
 app.use(cors());
 
+// Stel EJS in als template engine
+app.set('view engine', 'ejs');
+
 // Serve de statische bestanden van het dashboard (bijv. HTML, CSS, JS)
 app.use(express.static('public')); // Zorg ervoor dat de 'public' map bestaat
 
@@ -62,6 +65,22 @@ app.post('/dashboard/restart', (req, res) => {
 // Nieuwe route voor de consolepagina
 app.get('/dashboard/console', (req, res) => {
     res.sendFile(__dirname + '/public/console.html');  // Verwijs naar de nieuwe consolepagina
+});
+
+// Nieuwe route voor de commando lijst
+app.get('/dashboard/commands', (req, res) => {
+    const commandList = [];
+
+    // Voeg alle commando's toe aan een lijst
+    client.commands.forEach((command, name) => {
+        commandList.push({
+            name: command.name,
+            description: command.description || 'Geen beschrijving'
+        });
+    });
+
+    // Render de pagina met de commandolijst
+    res.render('commands', { commands: commandList });
 });
 
 // Setup WebSocket server voor console logs en commando's
