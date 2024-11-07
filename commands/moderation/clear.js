@@ -29,10 +29,11 @@ module.exports = {
         // Haal de berichten op die verwijderd moeten worden
         try {
             const messages = await message.channel.messages.fetch({ limit: aantal + 1 }); // Haal het aantal berichten op (plus 1 om het commando-bericht ook mee te nemen)
-            await message.channel.bulkDelete(messages);
+            await message.channel.bulkDelete(messages, true); // Verwijder berichten zonder message_reference
 
-            return message.reply({
-                content: `${aantal} berichten zijn verwijderd!`,
+            // Verstuur een bericht zonder message_reference
+            return message.channel.send({
+                content: `${aantal} berichten zijn verwijderd!`
             });
         } catch (error) {
             console.error(error);
