@@ -110,6 +110,11 @@ client.on('interactionCreate', async (interaction) => {
                         value: 'utility',
                         description: 'Bekijk utility commando\'s.',
                     },
+                    {
+                        label: 'owner',
+                        value: 'owner',
+                        description: 'Bekijk owner commando\'s.',
+                    },
                 ]),
         );
 
