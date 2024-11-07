@@ -165,5 +165,41 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
+const { sendLogToChannel } = require('./scripts/logging');
+
+// listeners voor logs
+const { logJoinLeave, logMessage, logModAction } = require('./scripts/logging');
+
+client.on('guildMemberAdd', member => {
+    const channel = member.guild.channels.cache.find(c => c.name === 'join-leave');
+    if (channel) logJoinLeave(channel, member, 'joined');
+});
+
+client.on('guildMemberRemove', member => {
+    const channel = member.guild.channels.cache.find(c => c.name === 'join-leave');
+    if (channel) logJoinLeave(channel, member, 'left');
+});
+
+client.on('messageDelete', message => {
+    const channel = message.guild.channels.cache.find(c => c.name === 'messages');
+    if (channel && message.partial === false) {
+        logMessage(channel, message, message);
+    }
+});
+
+client.on('messageUpdate', (oldMessage, newMessage) => {
+    const channel = oldMessage.guild.channels.cache.find(c => c.name === 'messages');
+    if (channel) logMessage(channel, oldMessage, newMessage);
+});
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+    const channel = newState.guild.channels.cache.find(c => c.name === 'voicecall');
+    if (channel) {
+        if (oldState.channelId !== newState.channelId) {
+            logModAction(channel, `${newState.member.user.tag} verliet de voice call: ${oldState.channel?.name ?? 'N/A'} en is nu in: ${newState.channel?.name ?? 'N/A'}`);
+        }
+    }
+});
+
 // Login de bot met de token uit config.json
 client.login(process.env.DISCORD_TOKEN);
