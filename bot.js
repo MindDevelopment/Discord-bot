@@ -1,3 +1,4 @@
+require('dotenv').config(); // Load environment variables from .env
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');  // Voeg EmbedBuilder hier toe
 const fs = require('fs');
 const path = require('path');
@@ -160,4 +161,4 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Login de bot met de token uit config.json
-client.login(config.token);
+client.login(process.env.DISCORD_TOKEN);
